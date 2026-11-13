@@ -30,8 +30,10 @@ if (-not $SecretsOnly) {
     if (git status --porcelain) {
         git -c user.name="ticket-hunter" -c user.email="ticket-hunter@users.noreply.github.com" commit -q -m "עדכון מערכת צייד כרטיסים" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     }
-    gh repo view $full *> $null
-    if ($LASTEXITCODE -ne 0) {
+    $exists = $true
+    try { $ErrorActionPreference = "Continue"; gh repo view $full 2>$null | Out-Null; if ($LASTEXITCODE -ne 0) { $exists = $false } }
+    catch { $exists = $false } finally { $ErrorActionPreference = "Stop" }
+    if (-not $exists) {
         gh repo create $full --public --source . --remote origin --push --description "מעקב מכירת כרטיסים להופעות"
     } else {
         if (-not (git remote)) { git remote add origin "https://github.com/$full.git" }
