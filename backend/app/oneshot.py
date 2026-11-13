@@ -5,6 +5,7 @@
 """
 import asyncio
 import logging
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -44,6 +45,11 @@ async def run(now: datetime | None = None, notifier: Notifier | None = None) -> 
                     out["errors"] += 1
                     db.add(ErrorLog(event_id=ev.id, level="error", message=f"תקלה פנימית: {e}"[:1000]))
                     db.commit()
+        if os.environ.get("SEND_TEST") == "true":
+            from .notifier import format_message
+            n = await notifier.notify(db, "test", f"test:{now.isoformat()}",
+                                      format_message("test", None, details="נשלח מהענן (GitHub). ההתראות עובדות ✅", now=now))
+            out["test"] = {"sent": n.sent, "channels": n.channels_sent, "error": n.error}
         out["reminders"] = await monitor.send_reminders(db, notifier, now)
         await notifier.retry_unsent(db)
     finally:
@@ -61,6 +67,8 @@ def main() -> int:
     for slug in out["skipped"]:
         print("· עוד לא הגיע הזמן:", slug)
     print("תזכורות שנשלחו:", out["reminders"])
+    if "test" in out:
+        print("התראת בדיקה:", "נשלחה" if out["test"]["sent"] else "נכשלה", out["test"]["channels"], out["test"]["error"])
     return 1 if out["errors"] else 0
 
 
