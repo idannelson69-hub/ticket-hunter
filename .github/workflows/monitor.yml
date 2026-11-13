@@ -1,0 +1,80 @@
+# ניטור כרטיסים — רץ בחינם על שרתי GitHub בערך כל 5 דקות (GitHub לפעמים מאחר בכמה דקות).
+# הסודות (טוקן טלגרם, סיסמת מייל וכו') נשמרים ב-GitHub Secrets ולא בקוד.
+name: ניטור כרטיסים
+
+on:
+  schedule:
+    - cron: "2-59/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ticket-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: התקנה
+        run: pip install -q -r requirements.txt
+
+      - name: שחזור מצב קודם (היסטוריה, מניעת כפילויות)
+        uses: actions/cache/restore@v4
+        with:
+          path: backend/data
+          key: th-state-${{ github.run_id }}
+          restore-keys: th-state-
+
+      - name: סבב בדיקה
+        env:
+          DATABASE_URL: sqlite:///./data/tickets.db
+          SCHEDULER_ENABLED: "false"
+          DEMO_MODE: "false"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+        run: python -m app.oneshot
+
+      - name: שמירת מצב
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: backend/data
+          key: th-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: התראה על תקלה
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$CHAT" ]; then
+            curl -s -o /dev/null -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+              -d chat_id="$CHAT" --data-urlencode text="🚨 תקלה בסבב הניטור של צייד כרטיסים. פרטים: $URL"
+          fi
+
+      - name: שמירה על הניטור פעיל (GitHub משבית תזמונים אחרי 60 יום בלי פעילות)
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable monitor.yml --repo "${{ github.repository }}" || true

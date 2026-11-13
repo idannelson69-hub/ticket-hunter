@@ -1,0 +1,11 @@
+.env
+.venv
+**/__pycache__
+**/node_modules
+frontend/.next
+frontend/out
+backend/data
+backend/.env
+backend/tests
+browser-profile
+.claude
