@@ -28,7 +28,7 @@ if (-not $SecretsOnly) {
     }
     Write-Host "✓ בדיקת בטיחות: אין סודות בקבצים"
     if (git status --porcelain) {
-        git -c user.name="ticket-hunter" -c user.email="ticket-hunter@users.noreply.github.com" commit -q -m "עדכון מערכת צייד כרטיסים" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+        $uid = gh api user --jq .id; git -c user.name="$owner" -c user.email="$uid+$owner@users.noreply.github.com" commit -q -m "עדכון מערכת צייד כרטיסים" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     }
     $exists = $true
     try { $ErrorActionPreference = "Continue"; gh repo view $full 2>$null | Out-Null; if ($LASTEXITCODE -ne 0) { $exists = $false } }
