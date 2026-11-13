@@ -42,10 +42,16 @@ if (-not $SecretsOnly) {
     Write-Host "✓ הקוד ב-GitHub: https://github.com/$full"
 }
 
-foreach ($name in @("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO", "TICKETMASTER_API_KEY")) {
-    if ($cfg[$name]) {
-        $cfg[$name] | gh secret set $name --repo $full
-        Write-Host "✓ סוד הוגדר: $name"
-    } else { Write-Host "· דילוג (ריק): $name" }
-}
+# הסודות עוברים דרך קובץ זמני (UTF-8 בלי BOM) ולא דרך צינור של PowerShell — שמשבש קידוד
+$tmpEnv = Join-Path $env:TEMP ("th-secrets-" + [guid]::NewGuid().ToString("N") + ".env")
+try {
+    $lines = @()
+    foreach ($name in @("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_TO", "TICKETMASTER_API_KEY")) {
+        $v = ($cfg[$name] -replace '[^\x21-\x7E]', '')   # רק תווים רגילים — בלי רווחים, BOM או סוף שורה
+        if ($v) { $lines += "$name=$v"; Write-Host "✓ סוד יוגדר: $name" } else { Write-Host "· דילוג (ריק): $name" }
+    }
+    [IO.File]::WriteAllText($tmpEnv, ($lines -join "`n") + "`n", $utf8)
+    gh secret set -f $tmpEnv --repo $full
+    if ($LASTEXITCODE -ne 0) { throw "הגדרת הסודות נכשלה" }
+} finally { Remove-Item $tmpEnv -Force -ErrorAction SilentlyContinue }
 Write-Host "מעקב אחרי ההרצות: https://github.com/$full/actions"
