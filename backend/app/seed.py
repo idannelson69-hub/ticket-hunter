@@ -26,7 +26,10 @@ EVENTS = [
         event_date=date(2027, 7, 31), event_date_verified=True,
         verification_note=("אומת 13.11.2026 בעמוד הרשמי של Live Nation Italia: \"Stray Kids World Tour <RUN IT MILAN>\", "
                            "שבת 31.7.2027, Stadio San Siro. מכירה כללית: חמישי 19.11.2026 15:00 ב-Ticketmaster, TicketOne ו-Vivaticket. "
-                           "מועדי Presale ב-18.11 דווחו בתקשורת בלבד ואינם מאומתים. סוגי מושבים ומחירים טרם פורסמו בעמוד הרשמי."),
+                           "עודכן 17.11.2026 לפי Ticketmaster Help ו-livenation.com/straykids: STAY Membership Presale "
+                           "רביעי 18.11 11:00–14:00 שעון המקום (לבעלי STAY 6th Generation שנרשמו ב-FANS עד 15.11; "
+                           "הקוד = מספר החברות, 12 תווים שמתחילים ב-F). Artist Presale 18.11 15:00–22:00 (הרשמה נסגרה 15.11). "
+                           "עד 4 כרטיסים להופעה, כרטיסים בנייד בלבד. סוגי מושבים ומחירים טרם פורסמו."),
         official_url="https://www.livenation.it/en/event/stray-kids-world-tour-run-it-milan--milano-tickets-edp1711785",
         ticket_count=4, max_price_per_ticket=150, max_total=600, seating="seated",
         require_adjacent=True, allow_split=True, allow_restricted_view=False,
@@ -41,10 +44,10 @@ EVENTS = [
         sale_dates=[
             {"name": "מכירה כללית", "start_utc": "2026-11-19T14:00:00+00:00", "verified": True,
              "source": "Live Nation Italia (עמוד רשמי)"},
-            {"name": "STAY Membership Presale (דיווח תקשורתי)", "start_utc": "2026-11-18T10:00:00+00:00",
-             "verified": False, "source": "תקשורת — לא מאומת"},
-            {"name": "Artist Presale (דיווח תקשורתי)", "start_utc": "2026-11-18T14:00:00+00:00",
-             "verified": False, "source": "תקשורת — לא מאומת"},
+            {"name": "STAY Membership Presale (קוד = מספר חברות F...)", "start_utc": "2026-11-18T10:00:00+00:00",
+             "verified": True, "source": "Ticketmaster Help + livenation.com/straykids (רשמי)"},
+            {"name": "Artist Presale", "start_utc": "2026-11-18T14:00:00+00:00",
+             "verified": True, "source": "Ticketmaster Help + livenation.com/straykids (רשמי)"},
         ],
     ),
     dict(
@@ -82,11 +85,25 @@ DEMO_EVENT = dict(
 )
 
 
+SEED_VERSION = 2   # להעלות כשמעדכנים מועדים/אימות — יעודכן גם בבסיס נתונים קיים (בענן)
+
+
 def seed(db: Session, demo: bool = False) -> None:
     items = EVENTS + ([DEMO_EVENT] if demo else [])
+    ver = db.get(KV, "seed_version")
+    upgrade = (ver.value.get("v", 1) if ver else 1) < SEED_VERSION
     for data in items:
-        if not db.query(Event).filter_by(slug=data["slug"]).first():
+        ev = db.query(Event).filter_by(slug=data["slug"]).first()
+        if not ev:
             db.add(Event(**data))
+        elif upgrade and data in EVENTS:
+            # מעדכן מועדים ידניים/אימות; שומר מועדים שהגיעו מ-Ticketmaster API
+            seeded_names = {d["name"] for d in data["sale_dates"]}
+            api_dates = [d for d in (ev.sale_dates or []) if d.get("source") == "Ticketmaster API"
+                         and d.get("name") not in seeded_names]
+            ev.sale_dates = list(data["sale_dates"]) + api_dates
+            ev.verification_note = data["verification_note"]
+    db.merge(KV(key="seed_version", value={"v": SEED_VERSION}))
     if not db.get(KV, "global_budget"):
         db.add(KV(key="global_budget", value={"amount": 900, "currency": "EUR"}))
     if not db.get(KV, "checklist"):

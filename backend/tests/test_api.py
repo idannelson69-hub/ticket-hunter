@@ -67,7 +67,8 @@ def test_seeded_events(authed):
     skz, oasis = evs["stray-kids-milano-2027"], evs["oasis-roma-2027"]
     assert skz["event_date"] == "2027-07-31" and skz["ticket_count"] == 4 and skz["max_total"] == 600
     assert skz["seating"] == "seated" and skz["allow_split"] is True
-    assert skz["next_verified_sale"]["start_utc"] == "2026-11-19T14:00:00+00:00"
+    verified = sorted(d["start_utc"] for d in skz["sale_dates"] if d["verified"])
+    assert verified == ["2026-11-18T10:00:00+00:00", "2026-11-18T14:00:00+00:00", "2026-11-19T14:00:00+00:00"]
     assert oasis["event_date"] == "2027-07-29" and oasis["status"] == "SOLD_OUT"
     assert oasis["ticket_count"] == 2 and oasis["max_total"] == 300
     # מגבלת קצב: לא מתחת למה שהמכסה הרשמית מתירה

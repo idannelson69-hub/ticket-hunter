@@ -174,8 +174,10 @@ async def test_reminders_tiers_only_verified(db, notifier, sender):
     # 10 דקות לפני — תזכורת 15 דקות
     assert await monitor.send_reminders(db, notifier, start - timedelta(minutes=10)) == 1
     assert await monitor.send_reminders(db, notifier, start + timedelta(minutes=1)) == 0
-    # מועדי ה-Presale שלא אומתו (18.11) לא מייצרים תזכורות
-    assert all("Presale" not in t for t in sender.sent)
+    # מועד לא מאומת לא מייצר תזכורות
+    ev.sale_dates = [{"name": "לא מאומת", "start_utc": "2026-11-20T10:00:00+00:00", "verified": False, "source": "x"}]
+    db.commit()
+    assert await monitor.send_reminders(db, notifier, datetime.fromisoformat("2026-11-20T09:50:00+00:00")) == 0
 
 
 @pytest.mark.asyncio
