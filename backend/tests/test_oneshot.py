@@ -37,12 +37,13 @@ async def test_runs_every_5_minutes_even_if_slightly_early(db):
     ch = Chan()
     n = Notifier(senders=[ch])
     r1 = await oneshot.run(T0, n)
-    assert len(r1["checked"]) == 2           # שתי ההופעות האמיתיות (הדמה כבויה)
+    assert len(r1["checked"]) == 1           # רק Oasis (Stray Kids נרכש — מעקב כבוי) # שתי ההופעות האמיתיות (הדמה כבויה)
     # GitHub הריץ 'מוקדם' ב-20 שניות — עדיין בודקים
     r2 = await oneshot.run(T0 + timedelta(minutes=5) - timedelta(seconds=20), n)
-    assert len(r2["checked"]) == 2 and r2["skipped"] == []
+    assert len(r2["checked"]) == 1 and r2["skipped"] == []
     db.expire_all()
-    assert db.query(CheckRun).filter(CheckRun.source_label == "Live Nation Italia").count() == 2
+    assert db.query(CheckRun).filter(CheckRun.source_label == "Live Nation Italia").count() == 0
+    assert db.query(CheckRun).filter(CheckRun.source_label == "oasisinet.com").count() == 2
 
 
 @pytest.mark.asyncio
@@ -65,6 +66,9 @@ async def test_state_unchanged_means_no_alerts(db):
 async def test_reminder_sent_by_oneshot(db):
     mock_pages()
     ch = Chan()
+    skz = db.query(Event).filter_by(slug="stray-kids-milano-2027").one()
+    skz.monitoring_enabled = True   # בודקים את מנגנון התזכורת
+    db.commit()
     start = datetime.fromisoformat("2026-11-19T14:00:00+00:00")
     r = await oneshot.run(start - timedelta(minutes=12), Notifier(senders=[ch]))
     assert r["reminders"] == 1

@@ -89,6 +89,13 @@ async def test_restock_alerts_each_cycle(db, notifier, sender):
     assert kinds == ["sold_out", "restock", "sold_out", "restock"]
 
 
+def enable_skz(db):
+    ev = db.query(Event).filter_by(slug="stray-kids-milano-2027").one()
+    ev.monitoring_enabled = True   # כבוי בנתוני הפתיחה (נרכש) — מפעילים לבדיקת המנגנון
+    db.commit()
+    return ev
+
+
 def tm_only(db, slug="stray-kids-milano-2027"):
     ev = db.query(Event).filter_by(slug=slug).one()
     ev.sources = [{"type": "ticketmaster_api", "label": "Ticketmaster API", "keyword": "Stray Kids"}]
@@ -164,7 +171,7 @@ async def test_sale_date_change_detected(db, notifier, sender):
 
 @pytest.mark.asyncio
 async def test_reminders_tiers_only_verified(db, notifier, sender):
-    ev = db.query(Event).filter_by(slug="stray-kids-milano-2027").one()
+    ev = enable_skz(db)
     start = datetime.fromisoformat("2026-11-19T14:00:00+00:00")
     # 23 שעות לפני — תזכורת 24 שעות בלבד
     assert await monitor.send_reminders(db, notifier, start - timedelta(hours=23)) == 1
@@ -183,6 +190,7 @@ async def test_reminders_tiers_only_verified(db, notifier, sender):
 @pytest.mark.asyncio
 async def test_reminder_late_start_skips_old_tiers(db, notifier, sender):
     """אם השרת עלה 30 דקות לפני — לא שולחים תזכורת '24 שעות' באיחור."""
+    enable_skz(db)
     start = datetime.fromisoformat("2026-11-19T14:00:00+00:00")
     await monitor.send_reminders(db, notifier, start - timedelta(minutes=30))
     assert len(sender.sent) == 1 and "בעוד שעה" in sender.sent[0]
@@ -206,6 +214,14 @@ async def test_health_check_detects_stalled_monitor(db, notifier, sender):
     stale = await monitor.health_check(db, notifier, T0)
     assert "oasis-roma-2027" in stale
     assert any("תקלה קריטית" in t for t in sender.sent)
+
+
+@pytest.mark.asyncio
+async def test_disabled_event_gets_no_reminders(db, notifier, sender):
+    """הופעה שהמעקב אחריה כובה (נרכשו כרטיסים) לא מקבלת תזכורות."""
+    start = datetime.fromisoformat("2026-11-19T14:00:00+00:00")
+    assert await monitor.send_reminders(db, notifier, start - timedelta(minutes=10)) == 0
+    assert sender.sent == []
 
 
 @pytest.mark.asyncio

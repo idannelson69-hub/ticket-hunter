@@ -72,8 +72,10 @@ def test_seeded_events(authed):
     assert oasis["event_date"] == "2027-07-29" and oasis["status"] == "SOLD_OUT"
     assert oasis["ticket_count"] == 2 and oasis["max_total"] == 300
     # מגבלת קצב: לא מתחת למה שהמכסה הרשמית מתירה
-    tm = next(s for s in skz["sources"] if s["type"] == "ticketmaster_api")
-    assert tm["min_interval"] >= 30
+    # 19.11.2026: נרכשו כרטיסים ל-Stray Kids — המעקב כבוי, Oasis ממשיך
+    assert skz["monitoring_enabled"] is False and oasis["monitoring_enabled"] is True
+    tm = next(s for s in oasis["sources"] if s["type"] == "ticketmaster_api")
+    assert tm["min_interval"] >= 15
 
 
 def test_add_event_without_code_change(authed):
@@ -112,8 +114,9 @@ def test_manual_offer_and_ranking(authed):
 
 def test_settings_and_budget(authed):
     s = authed.get("/api/settings").json()
-    assert s["global_budget"] == 900 and s["budget"]["allocated"] == 900 and s["budget"]["ok"]
-    s2 = authed.put("/api/settings", json={"global_budget": 850}).json()
+    # רק Oasis במעקב (300€)
+    assert s["global_budget"] == 900 and s["budget"]["allocated"] == 300 and s["budget"]["ok"]
+    s2 = authed.put("/api/settings", json={"global_budget": 250}).json()
     assert s2["budget"]["ok"] is False
 
 

@@ -29,7 +29,9 @@ EVENTS = [
                            "עודכן 17.11.2026 לפי Ticketmaster Help ו-livenation.com/straykids: STAY Membership Presale "
                            "רביעי 18.11 11:00–14:00 שעון המקום (לבעלי STAY 6th Generation שנרשמו ב-FANS עד 15.11; "
                            "הקוד = מספר החברות, 12 תווים שמתחילים ב-F). Artist Presale 18.11 15:00–22:00 (הרשמה נסגרה 15.11). "
-                           "עד 4 כרטיסים להופעה, כרטיסים בנייד בלבד. סוגי מושבים ומחירים טרם פורסמו."),
+                           "עד 4 כרטיסים להופעה, כרטיסים בנייד בלבד. סוגי מושבים ומחירים טרם פורסמו. "
+                           "19.11.2026: המשתמש דיווח שרכש כרטיסים — המעקב הופסק."),
+        monitoring_enabled=False,
         official_url="https://www.livenation.it/en/event/stray-kids-world-tour-run-it-milan--milano-tickets-edp1711785",
         ticket_count=4, max_price_per_ticket=150, max_total=600, seating="seated",
         require_adjacent=True, allow_split=True, allow_restricted_view=False,
@@ -85,7 +87,7 @@ DEMO_EVENT = dict(
 )
 
 
-SEED_VERSION = 2   # להעלות כשמעדכנים מועדים/אימות — יעודכן גם בבסיס נתונים קיים (בענן)
+SEED_VERSION = 3  # להעלות כשמעדכנים מועדים/אימות — יעודכן גם בבסיס נתונים קיים (בענן)
 
 
 def seed(db: Session, demo: bool = False) -> None:
@@ -103,6 +105,8 @@ def seed(db: Session, demo: bool = False) -> None:
                          and d.get("name") not in seeded_names]
             ev.sale_dates = list(data["sale_dates"]) + api_dates
             ev.verification_note = data["verification_note"]
+            if "monitoring_enabled" in data:
+                ev.monitoring_enabled = data["monitoring_enabled"]
     db.merge(KV(key="seed_version", value={"v": SEED_VERSION}))
     if not db.get(KV, "global_budget"):
         db.add(KV(key="global_budget", value={"amount": 900, "currency": "EUR"}))
